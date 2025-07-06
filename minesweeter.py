@@ -1,54 +1,61 @@
-import random
+from dataclasses import dataclass
 import math
 import pygame
+import random
 
-p = dict()
-p["bombs"] = 10
-p["columns"] = 9
-p["line-width"] = 3
-p["offset-h"] = 10
-p["offset-v"] = 10
-p["rows"] = 9
-p["screen-height"] = 500
-p["screen-width"] = 500
-p["square-size"] = 40
 
-p["font-size"] = math.ceil(0.8 * p["square-size"])
+@dataclass
+class Parameters:
+    # game parameters
+    bombs = 10
+    columns = 9
+    rows = 9
 
-number_colors = [
-    None,
-    (0, 0, 255),  # 1
-    (0, 128, 0),  # 2
-    (255, 0, 0),  # 3
-    (0, 0, 128),  # 4
-    (128, 0, 0),  # 5
-    (0, 128, 128),  # 6
-    (0, 0, 0),  # 7
-    (128, 128, 128),  # 8
-]
-background_color = (192, 192, 192)
-line_color = (128, 128, 128)
+    # graphics parameters
+    block_size = 40
+    color_number = [
+        None,
+        (0, 0, 255),  # 1
+        (0, 128, 0),  # 2
+        (255, 0, 0),  # 3
+        (0, 0, 128),  # 4
+        (128, 0, 0),  # 5
+        (0, 128, 128),  # 6
+        (0, 0, 0),  # 7
+        (128, 128, 128),  # 8
+    ]
+    color_background = (192, 192, 192)
+    color_line = (128, 128, 128)
+    font_size = math.ceil(0.8 * block_size)
+    line_width = 3
+    offset_h = 10
+    offset_v = 10
+    screen_height = 500
+    screen_width = 500
+
+
+PAR = Parameters()
 
 
 def get_block(board, row, col):
-    if row < 0 or row >= p["rows"]:
+    if row < 0 or row >= PAR.rows:
         return 0
-    if col < 0 or col >= p["columns"]:
+    if col < 0 or col >= PAR.columns:
         return 0
     return board[row][col]
 
 
 def init_board():
-    board = [[0 for _ in range(p["columns"])] for _ in range(p["rows"])]
+    board = [[0 for _ in range(PAR.columns)] for _ in range(PAR.rows)]
 
-    bombs = random.sample(range(p["rows"] * p["columns"]), p["bombs"])
-    for bomb in bombs:
-        row = bomb // p["columns"] - 1
-        col = bomb % p["columns"]
+    bomb_pos = random.sample(range(PAR.rows * PAR.columns), PAR.bombs)
+    for b_p in bomb_pos:
+        row = b_p // PAR.columns - 1
+        col = b_p % PAR.columns
         board[row][col] = -1
 
-    for row in range(0, p["rows"]):
-        for col in range(0, p["columns"]):
+    for row in range(0, PAR.rows):
+        for col in range(0, PAR.columns):
             if board[row][col] != 0:
                 continue
             num_bombs = 0
@@ -70,22 +77,22 @@ board = init_board()
 
 # pygame setup
 pygame.init()
-screen = pygame.display.set_mode((p["screen-width"], p["screen-height"]))
+screen = pygame.display.set_mode((PAR.screen_width, PAR.screen_height))
 pygame.display.set_caption("Minesweeper")
 clock = pygame.time.Clock()
 running = True
 dt = 0
-font = pygame.font.Font(pygame.font.get_default_font(), p["font-size"])
+font = pygame.font.Font(pygame.font.get_default_font(), PAR.font_size)
 
 
 def mouse_to_board_pos(pos):
-    x, y = pos[0] - p["offset-h"], pos[1] - p["offset-v"]
-    if not (0 <= x < p["columns"] * p["square-size"]) or not (
-        0 <= y < p["rows"] * p["square-size"]
+    x, y = pos[0] - PAR.offset_h, pos[1] - PAR.offset_v
+    if not (0 <= x < PAR.columns * PAR.block_size) or not (
+        0 <= y < PAR.rows * PAR.block_size
     ):
         return None
-    col = x // p["square-size"]
-    row = y // p["square-size"]
+    col = x // PAR.block_size
+    row = y // PAR.block_size
     return row, col
 
 
@@ -104,49 +111,51 @@ def open_block(pos):
 
 
 def draw_board():
-    height = p["rows"] * p["square-size"]
-    width = p["columns"] * p["square-size"]
+    height = PAR.rows * PAR.block_size
+    width = PAR.columns * PAR.block_size
 
     # horizontal lines
-    for r in range(p["rows"] + 1):
+    for r in range(PAR.rows + 1):
         pygame.draw.line(
             screen,
-            line_color,
-            (p["offset-h"], p["offset-v"] + r * p["square-size"]),
-            (p["offset-h"] + width, p["offset-v"] + r * p["square-size"]),
-            p["line-width"],
+            PAR.color_line,
+            (PAR.offset_h, PAR.offset_v + r * PAR.block_size),
+            (PAR.offset_h + width, PAR.offset_v + r * PAR.block_size),
+            PAR.line_width,
         )
     # vertical lines
-    for c in range(p["columns"] + 1):
+    for c in range(PAR.columns + 1):
         pygame.draw.line(
             screen,
-            line_color,
-            (p["offset-h"] + c * p["square-size"], p["offset-v"]),
-            (p["offset-h"] + c * p["square-size"], p["offset-v"] + height),
-            p["line-width"],
+            PAR.color_line,
+            (PAR.offset_h + c * PAR.block_size, PAR.offset_v),
+            (PAR.offset_h + c * PAR.block_size, PAR.offset_v + height),
+            PAR.line_width,
         )
 
-    for row in range(p["rows"]):
-        for col in range(p["columns"]):
+    for row in range(PAR.rows):
+        for col in range(PAR.columns):
             block = board[row][col]
             if block == 0:
                 continue
 
             if 0 < block < 9:
                 text = font.render(
-                    f"{board[row][col]}", antialias=True, color=number_colors[block]
+                    f"{board[row][col]}",
+                    antialias=True,
+                    color=PAR.color_number[block],
                 )
                 text_rect = text.get_rect()
                 # TODO: How does one center this?
                 screen.blit(
                     text,
                     dest=(
-                        p["offset-h"]
-                        + col * p["square-size"]
-                        + (p["square-size"] - text_rect.width + p["line-width"]) / 2,
-                        p["offset-v"]
-                        + row * p["square-size"]
-                        + (p["square-size"] - text_rect.height + p["line-width"]) / 2,
+                        PAR.offset_h
+                        + col * PAR.block_size
+                        + (PAR.block_size - text_rect.width + PAR.line_width) / 2,
+                        PAR.offset_v
+                        + row * PAR.block_size
+                        + (PAR.block_size - text_rect.height + PAR.line_width) / 2,
                     ),
                 )
 
@@ -156,12 +165,12 @@ def draw_board():
                 screen.blit(
                     text,
                     dest=(
-                        p["offset-h"]
-                        + col * p["square-size"]
-                        + (p["square-size"] - text_rect.width + p["line-width"]) / 2,
-                        p["offset-v"]
-                        + row * p["square-size"]
-                        + (p["square-size"] - text_rect.height + p["line-width"]) / 2,
+                        PAR.offset_h
+                        + col * PAR.block_size
+                        + (PAR.block_size - text_rect.width + PAR.line_width) / 2,
+                        PAR.offset_v
+                        + row * PAR.block_size
+                        + (PAR.block_size - text_rect.height + PAR.line_width) / 2,
                     ),
                 )
 
@@ -180,7 +189,7 @@ while running:
                 mark_block(pos)
 
     # fill the screen with a color to wipe away anything from last frame
-    screen.fill(background_color)
+    screen.fill(PAR.color_background)
 
     draw_board()
 

@@ -11,8 +11,13 @@ class Parameters:
     columns = 9
     rows = 9
 
+    id_bomb = 9
+
     # graphics parameters
     block_size = 40
+    color_background = (192, 192, 192)
+    color_flag = (128, 0, 64)
+    color_line = (128, 128, 128)
     color_number = [
         None,
         (0, 0, 255),  # 1
@@ -24,8 +29,6 @@ class Parameters:
         (0, 0, 0),  # 7
         (128, 128, 128),  # 8
     ]
-    color_background = (192, 192, 192)
-    color_line = (128, 128, 128)
     font_size = math.ceil(0.8 * block_size)
     line_width = 3
     offset_h = 10
@@ -54,7 +57,7 @@ class Board:
         for b_p in bomb_pos:
             row = b_p // PAR.columns - 1
             col = b_p % PAR.columns
-            self.board[row][col] = -1
+            self.board[row][col] = PAR.id_bomb
 
         # place bomb numbers
         for row in range(0, PAR.rows):
@@ -63,13 +66,13 @@ class Board:
                     continue
                 num_bombs = 0
                 for i in range(-1, 2):
-                    if self.get_block(row + i, col - 1) == -1:
+                    if self.get_block(row + i, col - 1) == PAR.id_bomb:
                         num_bombs += 1
-                    if self.get_block(row + i, col + 1) == -1:
+                    if self.get_block(row + i, col + 1) == PAR.id_bomb:
                         num_bombs += 1
-                if self.get_block(row - 1, col) == -1:
+                if self.get_block(row - 1, col) == PAR.id_bomb:
                     num_bombs += 1
-                if self.get_block(row + 1, col) == -1:
+                if self.get_block(row + 1, col) == PAR.id_bomb:
                     num_bombs += 1
                 self.board[row][col] = num_bombs
 
@@ -77,13 +80,17 @@ class Board:
         if pos is None:
             return None
         row, col = pos
-        self.board[row][col] = -2
+        self.board[row][col] *= -1
 
     def open_block(self, pos):
         if pos is None:
             return None
         row, col = pos
-        self.board[row][col] = 2
+        block = self.get_block(row, col)
+        if block < 0:
+            return None
+        if block == PAR.id_bomb:
+            print("you lose")
 
 
 BOARD = Board()
@@ -93,7 +100,7 @@ BOARD.init_board()
 # pygame setup
 pygame.init()
 screen = pygame.display.set_mode((PAR.screen_width, PAR.screen_height))
-pygame.display.set_caption("Minesweeper")
+pygame.display.set_caption("Minesweeter")
 clock = pygame.time.Clock()
 running = True
 dt = 0
@@ -160,8 +167,23 @@ def draw_board():
                     ),
                 )
 
-            if block == -1:
+            if block == PAR.id_bomb:
                 text = font.render("X", antialias=True, color=(0, 0, 0))
+                text_rect = text.get_rect()
+                screen.blit(
+                    text,
+                    dest=(
+                        PAR.offset_h
+                        + col * PAR.block_size
+                        + (PAR.block_size - text_rect.width + PAR.line_width) / 2,
+                        PAR.offset_v
+                        + row * PAR.block_size
+                        + (PAR.block_size - text_rect.height + PAR.line_width) / 2,
+                    ),
+                )
+
+            if block < 0:
+                text = font.render("F", antialias=True, color=PAR.color_flag)
                 text_rect = text.get_rect()
                 screen.blit(
                     text,

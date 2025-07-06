@@ -37,43 +37,58 @@ class Parameters:
 PAR = Parameters()
 
 
-def get_block(board, row, col):
-    if row < 0 or row >= PAR.rows:
-        return 0
-    if col < 0 or col >= PAR.columns:
-        return 0
-    return board[row][col]
+class Board:
+    def __init__(self):
+        self.board = [[0 for _ in range(PAR.columns)] for _ in range(PAR.rows)]
 
+    def get_block(self, row, col):
+        if row < 0 or row >= PAR.rows:
+            return 0
+        if col < 0 or col >= PAR.columns:
+            return 0
+        return self.board[row][col]
 
-def init_board():
-    board = [[0 for _ in range(PAR.columns)] for _ in range(PAR.rows)]
+    def init_board(self):
+        # place bombs
+        bomb_pos = random.sample(range(PAR.rows * PAR.columns), PAR.bombs)
+        for b_p in bomb_pos:
+            row = b_p // PAR.columns - 1
+            col = b_p % PAR.columns
+            self.board[row][col] = -1
 
-    bomb_pos = random.sample(range(PAR.rows * PAR.columns), PAR.bombs)
-    for b_p in bomb_pos:
-        row = b_p // PAR.columns - 1
-        col = b_p % PAR.columns
-        board[row][col] = -1
-
-    for row in range(0, PAR.rows):
-        for col in range(0, PAR.columns):
-            if board[row][col] != 0:
-                continue
-            num_bombs = 0
-            for i in range(-1, 2):
-                if get_block(board, row + i, col - 1) == -1:
+        # place bomb numbers
+        for row in range(0, PAR.rows):
+            for col in range(0, PAR.columns):
+                if self.board[row][col] != 0:
+                    continue
+                num_bombs = 0
+                for i in range(-1, 2):
+                    if self.get_block(row + i, col - 1) == -1:
+                        num_bombs += 1
+                    if self.get_block(row + i, col + 1) == -1:
+                        num_bombs += 1
+                if self.get_block(row - 1, col) == -1:
                     num_bombs += 1
-                if get_block(board, row + i, col + 1) == -1:
+                if self.get_block(row + 1, col) == -1:
                     num_bombs += 1
-            if get_block(board, row - 1, col) == -1:
-                num_bombs += 1
-            if get_block(board, row + 1, col) == -1:
-                num_bombs += 1
-            board[row][col] = num_bombs
+                self.board[row][col] = num_bombs
 
-    return board
+    def mark_block(self, pos):
+        if pos is None:
+            return None
+        row, col = pos
+        self.board[row][col] = -2
+
+    def open_block(self, pos):
+        if pos is None:
+            return None
+        row, col = pos
+        self.board[row][col] = 2
 
 
-board = init_board()
+BOARD = Board()
+BOARD.init_board()
+
 
 # pygame setup
 pygame.init()
@@ -94,20 +109,6 @@ def mouse_to_board_pos(pos):
     col = x // PAR.block_size
     row = y // PAR.block_size
     return row, col
-
-
-def mark_block(pos):
-    if pos is None:
-        return None
-    row, col = pos
-    board[row][col] = -2
-
-
-def open_block(pos):
-    if pos is None:
-        return None
-    row, col = pos
-    board[row][col] = 2
 
 
 def draw_board():
@@ -135,13 +136,13 @@ def draw_board():
 
     for row in range(PAR.rows):
         for col in range(PAR.columns):
-            block = board[row][col]
+            block = BOARD.get_block(row, col)
             if block == 0:
                 continue
 
             if 0 < block < 9:
                 text = font.render(
-                    f"{board[row][col]}",
+                    f"{block}",
                     antialias=True,
                     color=PAR.color_number[block],
                 )
@@ -184,9 +185,9 @@ while running:
         elif event.type == pygame.MOUSEBUTTONUP:
             pos = mouse_to_board_pos(pygame.mouse.get_pos())
             if event.button == 1:  # left click
-                open_block(pos)
+                BOARD.open_block(pos)
             elif event.button == 3:  # right click
-                mark_block(pos)
+                BOARD.mark_block(pos)
 
     # fill the screen with a color to wipe away anything from last frame
     screen.fill(PAR.color_background)

@@ -17,6 +17,7 @@ class Parameters:
     block_size = 40
     color_background = (192, 192, 192)
     color_flag = (128, 0, 64)
+    color_hidden = (100, 10, 10, 100)
     color_line = (128, 128, 128)
     color_number = [
         None,
@@ -31,71 +32,87 @@ class Parameters:
     ]
     font_size = math.ceil(0.8 * block_size)
     line_width = 3
-    offset_h = 10
-    offset_v = 10
-    screen_height = 500
-    screen_width = 500
-
-
-PAR = Parameters()
+    offset_h = block_size // 2
+    offset_v = block_size + block_size // 2
+    screen_height = block_size * 11
+    screen_width = block_size * 10
 
 
 class Board:
-    def __init__(self):
-        self.board = [[0 for _ in range(PAR.columns)] for _ in range(PAR.rows)]
+    def __init__(self, par):
+        self.par = par
+        self.board = [
+            [0 for _ in range(self.par.columns)] for _ in range(self.par.rows)
+        ]
+        self.is_visible = [
+            [False for _ in range(self.par.columns)] for _ in range(self.par.rows)
+        ]
 
-    def get_block(self, row, col):
-        if row < 0 or row >= PAR.rows:
+    def __getitem__(self, row_col):
+        row, col = self._row_col_valid(*row_col)
+        if row is not None:
+            return self.board[row][col]
+        else:
             return 0
-        if col < 0 or col >= PAR.columns:
-            return 0
-        return self.board[row][col]
+
+    def __setitem__(self, row_col, val):
+        row, col = self._row_col_valid(*row_col)
+        if row is not None:
+            self.board[row][col] = val
+
+    def _row_col_valid(self, row, col):
+        if 0 <= row and row < self.par.rows:
+            if 0 <= col and col < self.par.columns:
+                return row, col
+        return None, None
 
     def init_board(self):
         # place bombs
-        bomb_pos = random.sample(range(PAR.rows * PAR.columns), PAR.bombs)
+        bomb_pos = random.sample(
+            range(self.par.rows * self.par.columns), self.par.bombs
+        )
         for b_p in bomb_pos:
-            row = b_p // PAR.columns - 1
-            col = b_p % PAR.columns
-            self.board[row][col] = PAR.id_bomb
+            row = b_p // self.par.columns - 1
+            col = b_p % self.par.columns
+            self[row, col] = self.par.id_bomb
 
         # place bomb numbers
-        for row in range(0, PAR.rows):
-            for col in range(0, PAR.columns):
-                if self.board[row][col] != 0:
+        for row in range(self.par.rows):
+            for col in range(self.par.columns):
+                if self[row, col] != 0:
                     continue
                 num_bombs = 0
                 for i in range(-1, 2):
-                    if self.get_block(row + i, col - 1) == PAR.id_bomb:
+                    if self[row + i, col - 1] == self.par.id_bomb:
                         num_bombs += 1
-                    if self.get_block(row + i, col + 1) == PAR.id_bomb:
+                    if self[row + i, col + 1] == self.par.id_bomb:
                         num_bombs += 1
-                if self.get_block(row - 1, col) == PAR.id_bomb:
+                if self[row - 1, col] == self.par.id_bomb:
                     num_bombs += 1
-                if self.get_block(row + 1, col) == PAR.id_bomb:
+                if self[row + 1, col] == self.par.id_bomb:
                     num_bombs += 1
-                self.board[row][col] = num_bombs
+                self[row, col] = num_bombs
 
     def mark_block(self, pos):
         if pos is None:
             return None
         row, col = pos
-        self.board[row][col] *= -1
+        self[row, col] *= -1
 
     def open_block(self, pos):
         if pos is None:
             return None
         row, col = pos
-        block = self.get_block(row, col)
+        block = self[row, col]
         if block < 0:
             return None
-        if block == PAR.id_bomb:
+        if block == self.par.id_bomb:
             print("you lose")
 
 
-BOARD = Board()
+PAR = Parameters()
+BOARD = Board(PAR)
 BOARD.init_board()
-
 
 # pygame setup
 pygame.init()
@@ -143,7 +160,7 @@ def draw_board():
 
     for row in range(PAR.rows):
         for col in range(PAR.columns):
-            block = BOARD.get_block(row, col)
+            block = BOARD[row, col]
             if block == 0:
                 continue
 
@@ -200,7 +217,6 @@ def draw_board():
 
 while running:
     # poll for events
-    # pygame.QUIT event means the user clicked X to close your window
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
@@ -216,12 +232,11 @@ while running:
 
     draw_board()
 
-    # flip() the display to put your work on screen
+    # flip() the display to put on screen
     pygame.display.flip()
 
     # limits FPS to 60
-    # dt is delta time in seconds since last frame, used for framerate-
-    # independent physics.
+    # dt is delta time in seconds since last frame
     dt = clock.tick(60) / 1000
 
 pygame.quit()

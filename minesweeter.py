@@ -107,14 +107,48 @@ class Board:
     def open_block(self, pos):
         if pos is None:
             return None
-        row, col = pos
-        block = self[row, col]
-        if block < 0:
+        row, col = self._row_col_valid(*pos)
+        if row is None:
             return None
-        else:
-            self.is_visible[row][col] = True
+        block = self[row, col]
         if block == self.par.id_bomb:
             print("you lose")
+        else:
+            if block > 0:
+                self.is_visible[row][col] = True
+
+    def click_block(self, pos):
+        if pos is None:
+            return None
+        row, col = pos
+        block = self[row, col]
+        if block < 0:  # block is flagged
+            return None
+        else:
+            self.open_block(pos)
+
+            block = self[row, col]
+            if self.is_visible[row][col]:
+                if 0 < block < 9:
+                    # count flags surrounding the block
+                    num_flags = 0
+                    for i in range(-1, 2):
+                        if self[row + i, col - 1] < 0:
+                            num_flags += 1
+                        if self[row + i, col + 1] < 0:
+                            num_flags += 1
+                    if self[row - 1, col] < 0:
+                        num_flags += 1
+                    if self[row + 1, col] < 0:
+                        num_flags += 1
+
+                    # unveil all surrounding blocks
+                    if num_flags == block:
+                        for i in range(-1, 2):
+                            self.open_block((row + i, col - 1))
+                            self.open_block((row + i, col + 1))
+                        self.open_block((row - 1, col))
+                        self.open_block((row + 1, col))
 
     def block_is_visible(self, row, col):
         return self.is_visible[row][col]
@@ -165,6 +199,7 @@ def draw_board():
         for col in range(PAR.columns):
             block = BOARD[row, col]
 
+            # draw numbers
             if 0 < block < 9:
                 text = font.render(
                     f"{block}",
@@ -185,6 +220,7 @@ def draw_board():
                     ),
                 )
 
+            # draw bomb
             if block == PAR.id_bomb:
                 text = font.render("X", antialias=True, color=(0, 0, 0))
                 text_rect = text.get_rect()
@@ -200,9 +236,11 @@ def draw_board():
                     ),
                 )
 
+            # hide invisible blocks
             if not BOARD.block_is_visible(row, col):
                 draw_transparent_rect(screen, row, col)
 
+            # draw flags
             if block < 0:
                 text = font.render("F", antialias=True, color=PAR.color_flag)
                 text_rect = text.get_rect()
@@ -247,7 +285,7 @@ while running:
         elif event.type == pygame.MOUSEBUTTONUP:
             pos = mouse_to_board_pos(pygame.mouse.get_pos())
             if event.button == 1:  # left click
-                BOARD.open_block(pos)
+                BOARD.click_block(pos)
             elif event.button == 3:  # right click
                 BOARD.mark_block(pos)
 

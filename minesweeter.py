@@ -11,10 +11,11 @@ class Parameters:
     columns = 9
     rows = 9
 
-    id_bomb = 9
+    id_air = 9
+    id_bomb = 10
 
     # graphics parameters
-    block_size = 40
+    block_size = 100
     color_background = (192, 192, 192)
     color_flag = (128, 0, 64)
     color_hidden = (100, 10, 10, 100)
@@ -31,7 +32,7 @@ class Parameters:
         (128, 128, 128),  # 8
     ]
     font_size = math.ceil(0.8 * block_size)
-    line_width = 3
+    line_width = 15
     offset_h = block_size // 2
     offset_v = block_size + block_size // 2
     screen_height = block_size * 11
@@ -42,7 +43,7 @@ class Board:
     def __init__(self, par):
         self.par = par
         self.board = [
-            [0 for _ in range(self.par.columns)] for _ in range(self.par.rows)
+            [self.par.id_air for _ in range(self.par.columns)] for _ in range(self.par.rows)
         ]
         self.is_visible = [
             [False for _ in range(self.par.columns)] for _ in range(self.par.rows)
@@ -53,7 +54,7 @@ class Board:
         if row is not None:
             return self.board[row][col]
         else:
-            return 0
+            return self.par.id_air
 
     def __setitem__(self, row_col, val):
         row, col = self._row_col_valid(*row_col)
@@ -79,7 +80,7 @@ class Board:
         # place bomb numbers
         for row in range(self.par.rows):
             for col in range(self.par.columns):
-                if self[row, col] != 0:
+                if self[row, col] != self.par.id_air:
                     continue
                 num_bombs = 0
                 for i in range(-1, 2):
@@ -91,12 +92,15 @@ class Board:
                     num_bombs += 1
                 if self[row + 1, col] == self.par.id_bomb:
                     num_bombs += 1
-                self[row, col] = num_bombs
+                if num_bombs > 0:
+                    self[row, col] = num_bombs
 
     def mark_block(self, pos):
         if pos is None:
             return None
         row, col = pos
+        if self.is_visible[row][col]:
+            return None
         self[row, col] *= -1
 
     def open_block(self, pos):
@@ -106,8 +110,13 @@ class Board:
         block = self[row, col]
         if block < 0:
             return None
+        else:
+            self.is_visible[row][col] = True
         if block == self.par.id_bomb:
             print("you lose")
+
+    def block_is_visible(self, row, col):
+        return self.is_visible[row][col]
 
 
 PAR = Parameters()
@@ -135,33 +144,49 @@ def mouse_to_board_pos(pos):
     return row, col
 
 
+def draw_transparent_rect(screen, row, col):
+    rect = (
+        PAR.offset_h + col * PAR.block_size,
+        PAR.offset_v + row * PAR.block_size,
+        PAR.block_size,
+        PAR.block_size,
+    )
+    shape_surf = pygame.Surface(pygame.Rect(rect).size, pygame.SRCALPHA)
+    pygame.draw.rect(shape_surf, PAR.color_hidden, shape_surf.get_rect())
+    screen.blit(shape_surf, rect)
+
+
 def draw_board():
-    height = PAR.rows * PAR.block_size
-    width = PAR.columns * PAR.block_size
+    height = PAR.rows * PAR.block_size + PAR.line_width // 2
+    width = PAR.columns * PAR.block_size + PAR.line_width // 2
 
     # horizontal lines
     for r in range(PAR.rows + 1):
         pygame.draw.line(
             screen,
             PAR.color_line,
-            (PAR.offset_h, PAR.offset_v + r * PAR.block_size),
+            (PAR.offset_h - PAR.line_width // 2, PAR.offset_v + r * PAR.block_size),
             (PAR.offset_h + width, PAR.offset_v + r * PAR.block_size),
             PAR.line_width,
         )
+
     # vertical lines
     for c in range(PAR.columns + 1):
         pygame.draw.line(
             screen,
             PAR.color_line,
-            (PAR.offset_h + c * PAR.block_size, PAR.offset_v),
+            (PAR.offset_h + c * PAR.block_size, PAR.offset_v - PAR.line_width // 2),
             (PAR.offset_h + c * PAR.block_size, PAR.offset_v + height),
             PAR.line_width,
         )
 
     for row in range(PAR.rows):
         for col in range(PAR.columns):
+            if not BOARD.block_is_visible(row, col):
+                draw_transparent_rect(screen, row, col)
+
             block = BOARD[row, col]
-            if block == 0:
+            if block == PAR.id_air:
                 continue
 
             if 0 < block < 9:

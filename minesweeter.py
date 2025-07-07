@@ -18,7 +18,7 @@ class Parameters:
     block_size = 100
     color_background = (192, 192, 192)
     color_flag = (128, 0, 64)
-    color_hidden = (100, 10, 10, 100)
+    color_hidden = (100, 100, 100, 200)
     color_line = (128, 128, 128)
     color_number = [
         None,
@@ -43,7 +43,8 @@ class Board:
     def __init__(self, par):
         self.par = par
         self.board = [
-            [self.par.id_air for _ in range(self.par.columns)] for _ in range(self.par.rows)
+            [self.par.id_air for _ in range(self.par.columns)]
+            for _ in range(self.par.rows)
         ]
         self.is_visible = [
             [False for _ in range(self.par.columns)] for _ in range(self.par.rows)
@@ -160,34 +161,9 @@ def draw_board():
     height = PAR.rows * PAR.block_size + PAR.line_width // 2
     width = PAR.columns * PAR.block_size + PAR.line_width // 2
 
-    # horizontal lines
-    for r in range(PAR.rows + 1):
-        pygame.draw.line(
-            screen,
-            PAR.color_line,
-            (PAR.offset_h - PAR.line_width // 2, PAR.offset_v + r * PAR.block_size),
-            (PAR.offset_h + width, PAR.offset_v + r * PAR.block_size),
-            PAR.line_width,
-        )
-
-    # vertical lines
-    for c in range(PAR.columns + 1):
-        pygame.draw.line(
-            screen,
-            PAR.color_line,
-            (PAR.offset_h + c * PAR.block_size, PAR.offset_v - PAR.line_width // 2),
-            (PAR.offset_h + c * PAR.block_size, PAR.offset_v + height),
-            PAR.line_width,
-        )
-
     for row in range(PAR.rows):
         for col in range(PAR.columns):
-            if not BOARD.block_is_visible(row, col):
-                draw_transparent_rect(screen, row, col)
-
             block = BOARD[row, col]
-            if block == PAR.id_air:
-                continue
 
             if 0 < block < 9:
                 text = font.render(
@@ -224,6 +200,9 @@ def draw_board():
                     ),
                 )
 
+            if not BOARD.block_is_visible(row, col):
+                draw_transparent_rect(screen, row, col)
+
             if block < 0:
                 text = font.render("F", antialias=True, color=PAR.color_flag)
                 text_rect = text.get_rect()
@@ -238,6 +217,26 @@ def draw_board():
                         + (PAR.block_size - text_rect.height + PAR.line_width) / 2,
                     ),
                 )
+
+    # horizontal lines
+    for r in range(PAR.rows + 1):
+        pygame.draw.line(
+            screen,
+            PAR.color_line,
+            (PAR.offset_h - PAR.line_width // 2, PAR.offset_v + r * PAR.block_size),
+            (PAR.offset_h + width, PAR.offset_v + r * PAR.block_size),
+            PAR.line_width,
+        )
+
+    # vertical lines
+    for c in range(PAR.columns + 1):
+        pygame.draw.line(
+            screen,
+            PAR.color_line,
+            (PAR.offset_h + c * PAR.block_size, PAR.offset_v - PAR.line_width // 2),
+            (PAR.offset_h + c * PAR.block_size, PAR.offset_v + height),
+            PAR.line_width,
+        )
 
 
 while running:

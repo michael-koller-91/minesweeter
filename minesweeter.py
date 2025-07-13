@@ -122,6 +122,9 @@ class Board:
                     self[row, col] = num_num_bombs
 
     def flag(self, pos):
+        if self.state != 0:
+            return None
+
         if pos is None:
             return None
         row, col = pos
@@ -132,7 +135,8 @@ class Board:
         else:
             self.flag_counter += 1
         self[row, col] *= -1
-        return True
+
+        return self.state
 
     def unveil(self, pos):
         if pos is None:
@@ -175,6 +179,9 @@ class Board:
                     self.unveil((row + 1, col))
 
     def click(self, pos):
+        if self.state != 0:
+            return None
+
         if pos is None:
             return None
         row, col = pos
@@ -206,7 +213,7 @@ class Board:
                             self.unveil((row + i, col + 1))
                         self.unveil((row - 1, col))
                         self.unveil((row + 1, col))
-        return True
+        return self.state
 
     def block_is_visible(self, row, col):
         return self.is_visible[row][col]
@@ -413,13 +420,17 @@ while running:
             else:
                 pos = mouse_to_board_pos(pos)
                 if event.button == 1:  # left click
-                    r = BOARD.click(pos)
-                    if r is not None:
+                    state = BOARD.click(pos)
+                    if state == 0:
                         game_running = True
+                    else:
+                        game_running = False
                 elif event.button == 3:  # right click
-                    r = BOARD.flag(pos)
-                    if r is not None:
+                    state = BOARD.flag(pos)
+                    if state == 0:
                         game_running = True
+                    else:
+                        game_running = False
 
     # fill the screen with a color to wipe away anything from last frame
     screen.fill(PAR.color_background)

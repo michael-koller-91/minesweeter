@@ -420,7 +420,9 @@ while running:
         elif event.type == pygame.MOUSEBUTTONUP:
             pos = pygame.mouse.get_pos()
             if clicked_new_game(pos):
-                print("reset")
+                game_running = False
+                dt_accu = 0
+                BOARD.init_board()
             else:
                 pos = mouse_to_board_pos(pos)
                 if event.button == 1:  # left click

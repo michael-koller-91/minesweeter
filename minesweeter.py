@@ -7,7 +7,7 @@ import random
 @dataclass
 class Parameters:
     # game parameters
-    bombs = 10
+    num_bombs = 10
     columns = 9
     rows = 9
 
@@ -18,9 +18,12 @@ class Parameters:
     # graphics parameters
     block_size = 100
     color_background = (192, 192, 192)
+    color_bomb = (0, 0, 0)
+    color_counters = (255, 0, 0)
     color_flag = (128, 0, 64)
     color_hidden = (100, 100, 100, 200)
     color_line = (128, 128, 128)
+    color_losing_bomb = (255, 0, 0)
     color_number = [
         None,
         (0, 0, 255),  # 1
@@ -51,6 +54,7 @@ class Board:
             [False for _ in range(self.par.columns)] for _ in range(self.par.rows)
         ]
         self.bomb_positions = list()
+        self.flag_counter = self.par.num_bombs
 
     def __getitem__(self, row_col):
         row, col = self._row_col_valid(*row_col)
@@ -71,9 +75,9 @@ class Board:
         return None, None
 
     def init_board(self):
-        # place bombs
+        # place num_bombs
         bomb_pos = random.sample(
-            range(self.par.rows * self.par.columns), self.par.bombs
+            range(self.par.rows * self.par.columns), self.par.num_bombs
         )
         for b_p in bomb_pos:
             row = b_p // self.par.columns
@@ -86,18 +90,18 @@ class Board:
             for col in range(self.par.columns):
                 if self[row, col] != self.par.id_air:
                     continue
-                num_bombs = 0
+                num_num_bombs = 0
                 for i in range(-1, 2):
                     if self[row + i, col - 1] == self.par.id_bomb:
-                        num_bombs += 1
+                        num_num_bombs += 1
                     if self[row + i, col + 1] == self.par.id_bomb:
-                        num_bombs += 1
+                        num_num_bombs += 1
                 if self[row - 1, col] == self.par.id_bomb:
-                    num_bombs += 1
+                    num_num_bombs += 1
                 if self[row + 1, col] == self.par.id_bomb:
-                    num_bombs += 1
-                if num_bombs > 0:
-                    self[row, col] = num_bombs
+                    num_num_bombs += 1
+                if num_num_bombs > 0:
+                    self[row, col] = num_num_bombs
 
     def flag(self, pos):
         if pos is None:
@@ -105,6 +109,10 @@ class Board:
         row, col = pos
         if self.is_visible[row][col]:
             return None
+        if self[row, col] > 0:
+            self.flag_counter -= 1
+        else:
+            self.flag_counter += 1
         self[row, col] *= -1
 
     def unveil(self, pos):
@@ -219,10 +227,25 @@ def draw_transparent_rect(screen, row, col):
     screen.blit(shape_surf, rect)
 
 
-def draw_board():
+def draw():
     height = PAR.rows * PAR.block_size + PAR.line_width // 2
     width = PAR.columns * PAR.block_size + PAR.line_width // 2
 
+    # flag counter
+    if BOARD.flag_counter >= 0:
+        s = f"{BOARD.flag_counter:03}"
+    else:
+        s = f"{BOARD.flag_counter}"
+        if len(s) == 2:
+            s = "0" + s
+    text = font.render(s, antialias=True, color=PAR.color_counters)
+    text_rect = text.get_rect()
+    screen.blit(
+        text,
+        dest=(PAR.offset_h, PAR.block_size // 2),
+    )
+
+    # board
     for row in range(PAR.rows):
         for col in range(PAR.columns):
             block = BOARD[row, col]
@@ -251,9 +274,9 @@ def draw_board():
             # draw (losing) bomb
             if block == PAR.id_bomb or block == PAR.id_losing_bomb:
                 if block == PAR.id_bomb:
-                    text = font.render("X", antialias=True, color=(0, 0, 0))
+                    text = font.render("X", antialias=True, color=PAR.color_bomb)
                 else:
-                    text = font.render("X", antialias=True, color=(255, 0, 0))
+                    text = font.render("X", antialias=True, color=PAR.color_losing_bomb)
                 text_rect = text.get_rect()
                 screen.blit(
                     text,
@@ -323,7 +346,7 @@ while running:
     # fill the screen with a color to wipe away anything from last frame
     screen.fill(PAR.color_background)
 
-    draw_board()
+    draw()
 
     # flip() the display to put on screen
     pygame.display.flip()

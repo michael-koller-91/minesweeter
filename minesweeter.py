@@ -190,6 +190,10 @@ class Board:
             return None
         else:
             self.unveil(pos)
+            if self.par.rows * self.par.columns - sum(sum(x) for x in self.is_visible) == self.par.num_bombs:
+                for row, col in self.bomb_positions:
+                    self[row, col] = -self.par.id_bomb
+                self.state = 1
 
             block = self[row, col]
             if self.is_visible[row][col]:

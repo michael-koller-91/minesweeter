@@ -1,7 +1,19 @@
 from dataclasses import dataclass
+import argparse
 from math import ceil, floor
 import pygame
 import random
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-s", type=int, help="random seed", default=0)
+args = parser.parse_args()
+
+
+seed = args.s
+if seed == 0:
+    seed = random.randint(10_000_000, 100_000_000)
+print(seed)
+random.seed(seed)
 
 
 @dataclass

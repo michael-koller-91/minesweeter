@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-import math
+from math import ceil, floor
 import pygame
 import random
 
@@ -35,7 +35,7 @@ class Parameters:
         (0, 0, 0),  # 7
         (128, 128, 128),  # 8
     ]
-    font_size = math.ceil(0.8 * block_size)
+    font_size = ceil(0.8 * block_size)
     line_width = 15
     offset_h = block_size // 2
     offset_v = block_size + block_size // 2
@@ -114,6 +114,7 @@ class Board:
         else:
             self.flag_counter += 1
         self[row, col] *= -1
+        return True
 
     def unveil(self, pos):
         if pos is None:
@@ -185,6 +186,7 @@ class Board:
                             self.unveil((row + i, col + 1))
                         self.unveil((row - 1, col))
                         self.unveil((row + 1, col))
+        return True
 
     def block_is_visible(self, row, col):
         return self.is_visible[row][col]
@@ -227,7 +229,7 @@ def draw_transparent_rect(screen, row, col):
     screen.blit(shape_surf, rect)
 
 
-def draw():
+def draw(seconds):
     height = PAR.rows * PAR.block_size + PAR.line_width // 2
     width = PAR.columns * PAR.block_size + PAR.line_width // 2
 
@@ -244,6 +246,19 @@ def draw():
         text,
         dest=(PAR.offset_h, PAR.block_size // 2),
     )
+
+    # seconds counter
+    text = font.render(f"{floor(seconds):03}", antialias=True, color=PAR.color_counters)
+    text_rect = text.get_rect()
+    screen.blit(
+        text,
+        dest=(
+            PAR.offset_h + (PAR.columns - 2) * PAR.block_size + PAR.block_size // 2,
+            PAR.block_size // 2,
+        ),
+    )
+
+    # start/stop button
 
     # board
     for row in range(PAR.rows):
@@ -331,6 +346,8 @@ def draw():
         )
 
 
+dt_accu = 0
+game_running = False
 while running:
     # poll for events
     for event in pygame.event.get():
@@ -339,14 +356,18 @@ while running:
         elif event.type == pygame.MOUSEBUTTONUP:
             pos = mouse_to_board_pos(pygame.mouse.get_pos())
             if event.button == 1:  # left click
-                BOARD.click(pos)
+                r = BOARD.click(pos)
+                if r is not None:
+                    game_running = True
             elif event.button == 3:  # right click
-                BOARD.flag(pos)
+                r = BOARD.flag(pos)
+                if r is not None:
+                    game_running = True
 
     # fill the screen with a color to wipe away anything from last frame
     screen.fill(PAR.color_background)
 
-    draw()
+    draw(dt_accu)
 
     # flip() the display to put on screen
     pygame.display.flip()
@@ -354,5 +375,7 @@ while running:
     # limits FPS to 60
     # dt is delta time in seconds since last frame
     dt = clock.tick(60) / 1000
+    if game_running:
+        dt_accu += dt
 
 pygame.quit()

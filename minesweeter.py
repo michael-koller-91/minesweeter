@@ -79,11 +79,12 @@ class Board:
             [self.par.id_air for _ in range(self.par.columns)]
             for _ in range(self.par.rows)
         ]
+        self.first_left_click = True
+        self.flag_counter = self.par.num_mines
         self.is_visible = [
             [False for _ in range(self.par.columns)] for _ in range(self.par.rows)
         ]
         self.mine_positions = list()
-        self.flag_counter = self.par.num_mines
         self.state = 0
 
     def __getitem__(self, row_col):
@@ -198,8 +199,17 @@ class Board:
 
         if pos is None:
             return None
+
         row, col = pos
         block = self[row, col]
+
+        if self.first_left_click:
+            self.first_left_click = False
+            if self[row, col] == self.par.id_mine:
+                self.init_board()
+                self.click(pos)
+                return None
+
         if block < 0:  # block is flagged
             return None
         else:

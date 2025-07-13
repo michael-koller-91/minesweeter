@@ -1,5 +1,5 @@
-from dataclasses import dataclass
 import argparse
+from dataclasses import dataclass
 from math import ceil, floor
 import pygame
 import random
@@ -19,13 +19,13 @@ random.seed(seed)
 @dataclass
 class Parameters:
     # game parameters
-    num_bombs = 10
+    num_mines = 10
     columns = 9
     rows = 9
 
     id_air = 9
-    id_bomb = 10
-    id_losing_bomb = 11
+    id_losing_mine = 11
+    id_mine = 10
 
     # graphics parameters
     block_size = 100
@@ -44,12 +44,12 @@ class Parameters:
     color_state_neutral = (255, 255, 0)
     color_state_win = (0, 255, 0)
     color_background = (192, 192, 192)
-    color_bomb = (0, 0, 0)
     color_counters = (255, 0, 0)
     color_flag = (128, 0, 64)
     color_hidden = (100, 100, 100, 200)
     color_line = (128, 128, 128)
-    color_losing_bomb = (255, 0, 0)
+    color_losing_mine = (255, 0, 0)
+    color_mine = (0, 0, 0)
     color_number = [
         None,
         (0, 0, 255),  # 1
@@ -66,10 +66,12 @@ class Parameters:
 class Board:
     def __init__(self, par):
         self.par = par
+
         self.board = list()
-        self.is_visible = list()
-        self.bomb_positions = list()
+        self.first_left_click = True
         self.flag_counter = 0
+        self.is_visible = list()
+        self.mine_positions = list()
         self.state = 0
 
     def init(self):
@@ -80,8 +82,8 @@ class Board:
         self.is_visible = [
             [False for _ in range(self.par.columns)] for _ in range(self.par.rows)
         ]
-        self.bomb_positions = list()
-        self.flag_counter = self.par.num_bombs
+        self.mine_positions = list()
+        self.flag_counter = self.par.num_mines
         self.state = 0
 
     def __getitem__(self, row_col):
@@ -105,33 +107,33 @@ class Board:
     def init_board(self):
         self.init()
 
-        # place num_bombs
-        bomb_pos = random.sample(
-            range(self.par.rows * self.par.columns), self.par.num_bombs
+        # place num_mines
+        mine_pos = random.sample(
+            range(self.par.rows * self.par.columns), self.par.num_mines
         )
-        for b_p in bomb_pos:
+        for b_p in mine_pos:
             row = b_p // self.par.columns
             col = b_p % self.par.columns
-            self[row, col] = self.par.id_bomb
-            self.bomb_positions.append((row, col))
+            self[row, col] = self.par.id_mine
+            self.mine_positions.append((row, col))
 
-        # place bomb numbers
+        # place mine numbers
         for row in range(self.par.rows):
             for col in range(self.par.columns):
                 if self[row, col] != self.par.id_air:
                     continue
-                num_num_bombs = 0
+                mine_counter = 0
                 for i in range(-1, 2):
-                    if self[row + i, col - 1] == self.par.id_bomb:
-                        num_num_bombs += 1
-                    if self[row + i, col + 1] == self.par.id_bomb:
-                        num_num_bombs += 1
-                if self[row - 1, col] == self.par.id_bomb:
-                    num_num_bombs += 1
-                if self[row + 1, col] == self.par.id_bomb:
-                    num_num_bombs += 1
-                if num_num_bombs > 0:
-                    self[row, col] = num_num_bombs
+                    if self[row + i, col - 1] == self.par.id_mine:
+                        mine_counter += 1
+                    if self[row + i, col + 1] == self.par.id_mine:
+                        mine_counter += 1
+                if self[row - 1, col] == self.par.id_mine:
+                    mine_counter += 1
+                if self[row + 1, col] == self.par.id_mine:
+                    mine_counter += 1
+                if mine_counter > 0:
+                    self[row, col] = mine_counter
 
     def flag(self, pos):
         if self.state != 0:
@@ -160,9 +162,9 @@ class Board:
         if self.is_visible[row][col]:
             return None
 
-        if block == self.par.id_bomb:
-            self[row, col] = self.par.id_losing_bomb
-            for row, col in self.bomb_positions:
+        if block == self.par.id_mine:
+            self[row, col] = self.par.id_losing_mine
+            for row, col in self.mine_positions:
                 if self.is_visible[row][col] != self.par.id_air:
                     self.is_visible[row][col] = True
             self.state = -1
@@ -174,11 +176,11 @@ class Board:
                 # unveil connecting air and number blocks
                 for i in range(-1, 2):
                     if self[row + i, col - 1] == self.par.id_air or (
-                        0 < self[row + i, col - 1] and self[row + 1, col - 1] < 9
+                        0 < self[row + i, col - 1] and self[row + i, col - 1] < 9
                     ):
                         self.unveil((row + i, col - 1))
                     if self[row + i, col + 1] == self.par.id_air or (
-                        0 < self[row + i, col + 1] and self[row + 1, col + 1] < 9
+                        0 < self[row + i, col + 1] and self[row + i, col + 1] < 9
                     ):
                         self.unveil((row + i, col + 1))
                 if self[row - 1, col] == self.par.id_air or (
@@ -202,10 +204,6 @@ class Board:
             return None
         else:
             self.unveil(pos)
-            if self.par.rows * self.par.columns - sum(sum(x) for x in self.is_visible) == self.par.num_bombs:
-                for row, col in self.bomb_positions:
-                    self[row, col] = -self.par.id_bomb
-                self.state = 1
 
             block = self[row, col]
             if self.is_visible[row][col]:
@@ -229,6 +227,16 @@ class Board:
                             self.unveil((row + i, col + 1))
                         self.unveil((row - 1, col))
                         self.unveil((row + 1, col))
+
+        # check win condition
+        if (
+            self.par.rows * self.par.columns - sum(sum(x) for x in self.is_visible)
+            == self.par.num_mines
+        ):
+            for row, col in self.mine_positions:
+                self[row, col] = -self.par.id_mine
+            self.state = 1
+
         return self.state
 
     def block_is_visible(self, row, col):
@@ -362,12 +370,12 @@ def draw(seconds):
                     ),
                 )
 
-            # draw (losing) bomb
-            if block == PAR.id_bomb or block == PAR.id_losing_bomb:
-                if block == PAR.id_bomb:
-                    text = font.render("X", antialias=True, color=PAR.color_bomb)
+            # draw (losing) mine
+            if block == PAR.id_mine or block == PAR.id_losing_mine:
+                if block == PAR.id_mine:
+                    text = font.render("X", antialias=True, color=PAR.color_mine)
                 else:
-                    text = font.render("X", antialias=True, color=PAR.color_losing_bomb)
+                    text = font.render("X", antialias=True, color=PAR.color_losing_mine)
                 text_rect = text.get_rect()
                 screen.blit(
                     text,

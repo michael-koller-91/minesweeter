@@ -13,6 +13,7 @@ class Parameters:
 
     id_air = 9
     id_bomb = 10
+    id_losing_bomb = 11
 
     # graphics parameters
     block_size = 100
@@ -49,6 +50,7 @@ class Board:
         self.is_visible = [
             [False for _ in range(self.par.columns)] for _ in range(self.par.rows)
         ]
+        self.bomb_positions = list()
 
     def __getitem__(self, row_col):
         row, col = self._row_col_valid(*row_col)
@@ -74,9 +76,10 @@ class Board:
             range(self.par.rows * self.par.columns), self.par.bombs
         )
         for b_p in bomb_pos:
-            row = b_p // self.par.columns - 1
+            row = b_p // self.par.columns
             col = b_p % self.par.columns
             self[row, col] = self.par.id_bomb
+            self.bomb_positions.append((row, col))
 
         # place bomb numbers
         for row in range(self.par.rows):
@@ -96,7 +99,7 @@ class Board:
                 if num_bombs > 0:
                     self[row, col] = num_bombs
 
-    def mark_block(self, pos):
+    def flag(self, pos):
         if pos is None:
             return None
         row, col = pos
@@ -104,20 +107,45 @@ class Board:
             return None
         self[row, col] *= -1
 
-    def open_block(self, pos):
+    def unveil(self, pos):
         if pos is None:
             return None
         row, col = self._row_col_valid(*pos)
         if row is None:
             return None
         block = self[row, col]
+        if self.is_visible[row][col]:
+            return None
         if block == self.par.id_bomb:
-            print("you lose")
+            self[row, col] = self.par.id_losing_bomb
+            for row, col in self.bomb_positions:
+                if self.is_visible[row][col] != self.par.id_air:
+                    self.is_visible[row][col] = True
         else:
             if block > 0:
                 self.is_visible[row][col] = True
 
-    def click_block(self, pos):
+            if block == self.par.id_air:
+                # unveil connecting air and number blocks
+                for i in range(-1, 2):
+                    if self[row + i, col - 1] == self.par.id_air or (
+                        0 < self[row + i, col - 1] and self[row + 1, col - 1] < 9
+                    ):
+                        self.unveil((row + i, col - 1))
+                    if self[row + i, col + 1] == self.par.id_air or (
+                        0 < self[row + i, col + 1] and self[row + 1, col + 1] < 9
+                    ):
+                        self.unveil((row + i, col + 1))
+                if self[row - 1, col] == self.par.id_air or (
+                    0 < self[row - 1, col] and self[row - 1, col] < 9
+                ):
+                    self.unveil((row - 1, col))
+                if self[row + 1, col] == self.par.id_air or (
+                    0 < self[row + 1, col] and self[row + 1, col] < 9
+                ):
+                    self.unveil((row + 1, col))
+
+    def click(self, pos):
         if pos is None:
             return None
         row, col = pos
@@ -125,7 +153,7 @@ class Board:
         if block < 0:  # block is flagged
             return None
         else:
-            self.open_block(pos)
+            self.unveil(pos)
 
             block = self[row, col]
             if self.is_visible[row][col]:
@@ -145,10 +173,10 @@ class Board:
                     # unveil all surrounding blocks
                     if num_flags == block:
                         for i in range(-1, 2):
-                            self.open_block((row + i, col - 1))
-                            self.open_block((row + i, col + 1))
-                        self.open_block((row - 1, col))
-                        self.open_block((row + 1, col))
+                            self.unveil((row + i, col - 1))
+                            self.unveil((row + i, col + 1))
+                        self.unveil((row - 1, col))
+                        self.unveil((row + 1, col))
 
     def block_is_visible(self, row, col):
         return self.is_visible[row][col]
@@ -220,9 +248,12 @@ def draw_board():
                     ),
                 )
 
-            # draw bomb
-            if block == PAR.id_bomb:
-                text = font.render("X", antialias=True, color=(0, 0, 0))
+            # draw (losing) bomb
+            if block == PAR.id_bomb or block == PAR.id_losing_bomb:
+                if block == PAR.id_bomb:
+                    text = font.render("X", antialias=True, color=(0, 0, 0))
+                else:
+                    text = font.render("X", antialias=True, color=(255, 0, 0))
                 text_rect = text.get_rect()
                 screen.blit(
                     text,
@@ -285,9 +316,9 @@ while running:
         elif event.type == pygame.MOUSEBUTTONUP:
             pos = mouse_to_board_pos(pygame.mouse.get_pos())
             if event.button == 1:  # left click
-                BOARD.click_block(pos)
+                BOARD.click(pos)
             elif event.button == 3:  # right click
-                BOARD.mark_block(pos)
+                BOARD.flag(pos)
 
     # fill the screen with a color to wipe away anything from last frame
     screen.fill(PAR.color_background)

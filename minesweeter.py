@@ -17,6 +17,20 @@ class Parameters:
 
     # graphics parameters
     block_size = 100
+    font_size = ceil(0.8 * block_size)
+    font_size_counters = ceil(1.5 * block_size)
+    line_width = 15
+    offset_h = block_size // 2
+    offset_v = 2.5 * block_size
+    screen_height = block_size * 12
+    screen_width = block_size * 10
+    start_button_size = 1.5 * block_size
+    start_button_tl_coords = ((screen_width - start_button_size) // 2, block_size // 2)
+
+    # colors
+    color_state_loss = (255, 0, 0)
+    color_state_neutral = (255, 255, 0)
+    color_state_win = (0, 255, 0)
     color_background = (192, 192, 192)
     color_bomb = (0, 0, 0)
     color_counters = (255, 0, 0)
@@ -35,17 +49,18 @@ class Parameters:
         (0, 0, 0),  # 7
         (128, 128, 128),  # 8
     ]
-    font_size = ceil(0.8 * block_size)
-    line_width = 15
-    offset_h = block_size // 2
-    offset_v = block_size + block_size // 2
-    screen_height = block_size * 11
-    screen_width = block_size * 10
 
 
 class Board:
     def __init__(self, par):
         self.par = par
+        self.board = list()
+        self.is_visible = list()
+        self.bomb_positions = list()
+        self.flag_counter = 0
+        self.state = 0
+
+    def init(self):
         self.board = [
             [self.par.id_air for _ in range(self.par.columns)]
             for _ in range(self.par.rows)
@@ -55,6 +70,7 @@ class Board:
         ]
         self.bomb_positions = list()
         self.flag_counter = self.par.num_bombs
+        self.state = 0
 
     def __getitem__(self, row_col):
         row, col = self._row_col_valid(*row_col)
@@ -75,6 +91,8 @@ class Board:
         return None, None
 
     def init_board(self):
+        self.init()
+
         # place num_bombs
         bomb_pos = random.sample(
             range(self.par.rows * self.par.columns), self.par.num_bombs
@@ -125,11 +143,13 @@ class Board:
         block = self[row, col]
         if self.is_visible[row][col]:
             return None
+
         if block == self.par.id_bomb:
             self[row, col] = self.par.id_losing_bomb
             for row, col in self.bomb_positions:
                 if self.is_visible[row][col] != self.par.id_air:
                     self.is_visible[row][col] = True
+            self.state = -1
         else:
             if block > 0:
                 self.is_visible[row][col] = True
@@ -204,6 +224,20 @@ clock = pygame.time.Clock()
 running = True
 dt = 0
 font = pygame.font.Font(pygame.font.get_default_font(), PAR.font_size)
+font_counters = pygame.font.SysFont("liberationmono", PAR.font_size_counters)
+
+
+def clicked_new_game(pos):
+    if (
+        PAR.start_button_tl_coords[0] <= pos[0]
+        and pos[0] <= PAR.start_button_tl_coords[0] + PAR.start_button_size
+    ):
+        if (
+            PAR.start_button_tl_coords[1] <= pos[1]
+            and pos[1] <= PAR.start_button_tl_coords[1] + PAR.start_button_size
+        ):
+            return True
+    return False
 
 
 def mouse_to_board_pos(pos):
@@ -212,8 +246,8 @@ def mouse_to_board_pos(pos):
         0 <= y < PAR.rows * PAR.block_size
     ):
         return None
-    col = x // PAR.block_size
-    row = y // PAR.block_size
+    col = round(x // PAR.block_size)
+    row = round(y // PAR.block_size)
     return row, col
 
 
@@ -240,7 +274,7 @@ def draw(seconds):
         s = f"{BOARD.flag_counter}"
         if len(s) == 2:
             s = "0" + s
-    text = font.render(s, antialias=True, color=PAR.color_counters)
+    text = font_counters.render(s, antialias=True, color=PAR.color_counters)
     text_rect = text.get_rect()
     screen.blit(
         text,
@@ -248,17 +282,36 @@ def draw(seconds):
     )
 
     # seconds counter
-    text = font.render(f"{floor(seconds):03}", antialias=True, color=PAR.color_counters)
+    text = font_counters.render(
+        f"{floor(seconds):03}", antialias=True, color=PAR.color_counters
+    )
     text_rect = text.get_rect()
     screen.blit(
         text,
         dest=(
-            PAR.offset_h + (PAR.columns - 2) * PAR.block_size + PAR.block_size // 2,
+            PAR.screen_width - PAR.offset_h - 3 * PAR.block_size,
             PAR.block_size // 2,
         ),
     )
 
     # start/stop button
+    pygame.draw.rect(
+        screen,
+        PAR.color_hidden,
+        (*PAR.start_button_tl_coords, PAR.start_button_size, PAR.start_button_size),
+    )
+    state_color = PAR.color_state_neutral
+    if BOARD.state == 1:
+        state_color = PAR.color_state_win
+    elif BOARD.state == -1:
+        state_color = PAR.color_state_loss
+    pygame.draw.circle(
+        screen,
+        state_color,
+        (PAR.screen_width // 2, (0.5 + 1.5 / 2) * PAR.block_size),
+        PAR.block_size // 2,
+        PAR.block_size // 2,
+    )
 
     # board
     for row in range(PAR.rows):
@@ -354,15 +407,19 @@ while running:
         if event.type == pygame.QUIT:
             running = False
         elif event.type == pygame.MOUSEBUTTONUP:
-            pos = mouse_to_board_pos(pygame.mouse.get_pos())
-            if event.button == 1:  # left click
-                r = BOARD.click(pos)
-                if r is not None:
-                    game_running = True
-            elif event.button == 3:  # right click
-                r = BOARD.flag(pos)
-                if r is not None:
-                    game_running = True
+            pos = pygame.mouse.get_pos()
+            if clicked_new_game(pos):
+                print("reset")
+            else:
+                pos = mouse_to_board_pos(pos)
+                if event.button == 1:  # left click
+                    r = BOARD.click(pos)
+                    if r is not None:
+                        game_running = True
+                elif event.button == 3:  # right click
+                    r = BOARD.flag(pos)
+                    if r is not None:
+                        game_running = True
 
     # fill the screen with a color to wipe away anything from last frame
     screen.fill(PAR.color_background)

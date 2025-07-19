@@ -75,137 +75,129 @@ class Board:
         self.state = 0
 
     def init(self):
-        self.board = [
-            [self.par.id_air for _ in range(self.par.columns)]
-            for _ in range(self.par.rows)
-        ]
+        self.board = [self.par.id_air] * self.par.columns * self.par.rows
         self.first_left_click = True
         self.flag_counter = self.par.num_mines
-        self.is_visible = [
-            [False for _ in range(self.par.columns)] for _ in range(self.par.rows)
-        ]
-        self.mine_positions = list()
+        self.is_visible = [False] * self.par.columns * self.par.rows
+        self.mine_positions = random.sample(
+            range(self.par.rows * self.par.columns), self.par.num_mines
+        )
         self.state = 0
 
-    def __getitem__(self, row_col):
-        row, col = self._row_col_valid(*row_col)
-        if row is not None:
-            return self.board[row][col]
-        else:
-            return self.par.id_air
+    def to_linear(self, key):
+        if type(key) is int:
+            if 0 <= key and key < len(self.board):
+                return key
+        elif type(key) is tuple and len(key) == 2:
+            if 0 <= key[0] and key[0] < self.par.rows:
+                if 0 <= key[1] and key[1] < self.par.columns:
+                    return key[0] * self.par.columns + key[1]
 
-    def __setitem__(self, row_col, val):
-        row, col = self._row_col_valid(*row_col)
-        if row is not None:
-            self.board[row][col] = val
+    def linear_to_grid(self, key):
+        row = key // self.par.columns
+        col = key % self.par.columns
+        return row, col
 
-    def _row_col_valid(self, row, col):
-        if 0 <= row and row < self.par.rows:
-            if 0 <= col and col < self.par.columns:
-                return row, col
-        return None, None
+    def __getitem__(self, key):
+        _key = self.to_linear(key)
+        if _key is not None:
+            return self.board[_key]
+
+    def __setitem__(self, key, val):
+        _key = self.to_linear(key)
+        if _key is not None:
+            self.board[_key] = val
+
+    def _neighbors(self, key):
+        _key = self.to_linear(key)
+        if key is not None:
+            row, col = self.linear_to_grid(_key)
+            neighbors = list()
+            for i in range(-1, 2):
+                neighbors.append((row + i, col - 1))
+                neighbors.append((row + i, col + 1))
+            neighbors.append((row - 1, col))
+            neighbors.append((row + 1, col))
+        _neighbors = [self.to_linear(neighbor) for neighbor in neighbors]
+        return [neighbor for neighbor in _neighbors if neighbor is not None]
 
     def init_board(self):
         self.init()
 
-        # place num_mines
-        mine_pos = random.sample(
-            range(self.par.rows * self.par.columns), self.par.num_mines
-        )
-        for b_p in mine_pos:
-            row = b_p // self.par.columns
-            col = b_p % self.par.columns
-            self[row, col] = self.par.id_mine
-            self.mine_positions.append((row, col))
+        # place mines
+        for m_p in self.mine_positions:
+            self.__setitem__(m_p, self.par.id_mine)
 
         # place mine numbers
-        for row in range(self.par.rows):
-            for col in range(self.par.columns):
-                if self[row, col] != self.par.id_air:
-                    continue
-                mine_counter = 0
-                for i in range(-1, 2):
-                    if self[row + i, col - 1] == self.par.id_mine:
-                        mine_counter += 1
-                    if self[row + i, col + 1] == self.par.id_mine:
-                        mine_counter += 1
-                if self[row - 1, col] == self.par.id_mine:
+        for key in range(len(self.board)):
+            if self.board[key] != self.par.id_air:
+                continue
+            mine_counter = 0
+            for n_key in self._neighbors(key):
+                if self.board[n_key] == self.par.id_mine:
                     mine_counter += 1
-                if self[row + 1, col] == self.par.id_mine:
-                    mine_counter += 1
-                if mine_counter > 0:
-                    self[row, col] = mine_counter
+            if mine_counter > 0:
+                self.board[key] = mine_counter
 
     def flag(self, pos):
         if self.state != 0:
             return None
 
-        if pos is None:
+        _key = self.to_linear(pos)
+        if _key is None:
             return None
-        row, col = pos
-        if self.is_visible[row][col]:
+
+        if self.is_visible[_key]:
             return None
-        if self[row, col] > 0:
+
+        if self.board[_key] > 0:
             self.flag_counter -= 1
         else:
             self.flag_counter += 1
-        self[row, col] *= -1
+        self.board[_key] *= -1
 
         return self.state
 
     def unveil(self, pos):
-        if pos is None:
-            return None
-        row, col = self._row_col_valid(*pos)
-        if row is None:
-            return None
-        block = self[row, col]
-        if self.is_visible[row][col]:
+        _key = self.to_linear(pos)
+        if _key is None:
             return None
 
+        if self.is_visible[_key]:
+            return None
+
+        block = self.board[_key]
+
         if block == self.par.id_mine:
-            self[row, col] = self.par.id_losing_mine
-            for row, col in self.mine_positions:
-                if self.is_visible[row][col] != self.par.id_air:
-                    self.is_visible[row][col] = True
+            self.board[_key] = self.par.id_losing_mine
+            for m_p in self.mine_positions:
+                self.is_visible[m_p] = True
             self.state = -1
         else:
             if block > 0:
-                self.is_visible[row][col] = True
+                self.is_visible[_key] = True
 
             if block == self.par.id_air:
                 # unveil connecting air and number blocks
-                for i in range(-1, 2):
-                    if self[row + i, col - 1] == self.par.id_air or (
-                        0 < self[row + i, col - 1] and self[row + i, col - 1] < 9
+                for n_key in self._neighbors(_key):
+                    if self.board[n_key] == self.par.id_air or (
+                        0 < self.board[n_key] and self.board[n_key] < 9
                     ):
-                        self.unveil((row + i, col - 1))
-                    if self[row + i, col + 1] == self.par.id_air or (
-                        0 < self[row + i, col + 1] and self[row + i, col + 1] < 9
-                    ):
-                        self.unveil((row + i, col + 1))
-                if self[row - 1, col] == self.par.id_air or (
-                    0 < self[row - 1, col] and self[row - 1, col] < 9
-                ):
-                    self.unveil((row - 1, col))
-                if self[row + 1, col] == self.par.id_air or (
-                    0 < self[row + 1, col] and self[row + 1, col] < 9
-                ):
-                    self.unveil((row + 1, col))
+                        self.unveil(n_key)
 
     def click(self, pos):
         if self.state != 0:
             return None
 
-        if pos is None:
+        _key = self.to_linear(pos)
+        if _key is None:
             return None
 
-        row, col = pos
-        block = self[row, col]
+        block = self.board[_key]
 
         if self.first_left_click:
             self.first_left_click = False
-            if self[row, col] == self.par.id_mine:
+            if self.board[_key] == self.par.id_mine:
                 self.init_board()
                 self.click(pos)
                 return None
@@ -215,42 +207,33 @@ class Board:
         else:
             self.unveil(pos)
 
-            block = self[row, col]
-            if self.is_visible[row][col]:
+            if self.is_visible[_key]:
                 if 0 < block < 9:
                     # count flags surrounding the block
                     num_flags = 0
-                    for i in range(-1, 2):
-                        if self[row + i, col - 1] < 0:
+                    for n_key in self._neighbors(_key):
+                        if self.board[n_key] < 0:
                             num_flags += 1
-                        if self[row + i, col + 1] < 0:
-                            num_flags += 1
-                    if self[row - 1, col] < 0:
-                        num_flags += 1
-                    if self[row + 1, col] < 0:
-                        num_flags += 1
 
                     # unveil all surrounding blocks
                     if num_flags == block:
-                        for i in range(-1, 2):
-                            self.unveil((row + i, col - 1))
-                            self.unveil((row + i, col + 1))
-                        self.unveil((row - 1, col))
-                        self.unveil((row + 1, col))
+                        for n_key in self._neighbors(_key):
+                            self.unveil(n_key)
 
         # check win condition
-        if (
-            self.par.rows * self.par.columns - sum(sum(x) for x in self.is_visible)
-            == self.par.num_mines
-        ):
-            for row, col in self.mine_positions:
-                self[row, col] = -self.par.id_mine
+        if len(self.board) - sum(self.is_visible) == self.par.num_mines:
+            for m_p in self.mine_positions:
+                self.board[m_p] = -self.par.id_mine
             self.state = 1
 
         return self.state
 
     def block_is_visible(self, row, col):
-        return self.is_visible[row][col]
+        _key = self.to_linear((row, col))
+        if _key is None:
+            return False
+        else:
+            return self.is_visible[_key]
 
 
 PAR = Parameters()
@@ -483,3 +466,6 @@ while running:
         dt_accu += dt
 
 pygame.quit()
+
+# row = b_p // self.par.columns
+# col = b_p % self.par.columns

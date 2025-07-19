@@ -298,7 +298,7 @@ def draw(seconds):
         s = f"{BOARD.flag_counter}"
         if len(s) == 2:
             s = "0" + s
-    text = font_counters.render(s, antialias=True, color=PAR.color_counters)
+    text = font_counters.render(s, True, PAR.color_counters)
     text_rect = text.get_rect()
     screen.blit(
         text,
@@ -306,9 +306,7 @@ def draw(seconds):
     )
 
     # seconds counter
-    text = font_counters.render(
-        f"{floor(seconds):03}", antialias=True, color=PAR.color_counters
-    )
+    text = font_counters.render(f"{floor(seconds):03}", True, PAR.color_counters)
     text_rect = text.get_rect()
     screen.blit(
         text,
@@ -346,8 +344,8 @@ def draw(seconds):
             if 0 < block < 9:
                 text = font.render(
                     f"{block}",
-                    antialias=True,
-                    color=PAR.color_number[block],
+                    True,
+                    PAR.color_number[block],
                 )
                 text_rect = text.get_rect()
                 # TODO: How does one center this?
@@ -366,9 +364,9 @@ def draw(seconds):
             # draw (losing) mine
             if block == PAR.id_mine or block == PAR.id_losing_mine:
                 if block == PAR.id_mine:
-                    text = font.render("X", antialias=True, color=PAR.color_mine)
+                    text = font.render("X", True, PAR.color_mine)
                 else:
-                    text = font.render("X", antialias=True, color=PAR.color_losing_mine)
+                    text = font.render("X", True, PAR.color_losing_mine)
                 text_rect = text.get_rect()
                 screen.blit(
                     text,
@@ -388,7 +386,7 @@ def draw(seconds):
 
             # draw flags
             if block < 0:
-                text = font.render("F", antialias=True, color=PAR.color_flag)
+                text = font.render("F", True, PAR.color_flag)
                 text_rect = text.get_rect()
                 screen.blit(
                     text,

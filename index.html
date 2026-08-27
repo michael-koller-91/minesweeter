@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minesweeter PWA</title>
+  <link rel="canonical" href="https://michael-koller-91.github.io/minesweeter/" />
+  <link rel="manifest" href="/minesweeter/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/minesweeter/img/icon.png">
+  <meta name="apple-mobile-web-app-title" content="Minesweeter">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+
+  <h1>Minesweeter</h1>
+  <script>
+    if (navigator.serviceWorker) {
+      navigator.serviceWorker.register(
+        '/minesweeter/sw.js',
+        { scope: '/minesweeter/' }
+      )
+    }
+  </script>
+
+  <footer id="version"></footer>
+
+  <script src="js/version.js"></script>
+  <script>
+    document.getElementById('version').textContent = 'v' + APP_VERSION;
+  </script>
+  <script src="js/app.js"></script>
+</body>
+
+</html>

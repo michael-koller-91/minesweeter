@@ -75,7 +75,7 @@ function reveal(i) {
         const r = Math.floor(j / W), c = j % W;
         if (r < 1 || r > ROWS || c < 1 || c > COLS) continue; // skip padded border
         if (revealed[j] || flagged[j] || mined[j]) continue;
-        revealed[j] = 1; newly.push(j);
+        revealed[j] = 1; revealedCount++; newly.push(j);
         if (counts[j] === 0) stack.push(j);
       }
     }

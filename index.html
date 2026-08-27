@@ -17,6 +17,17 @@
 <body>
 
   <h1>Minesweeter</h1>
+
+  <div id="status">
+    <span id="mineCount">Mines: 10</span>
+    <button id="reset" type="button">New game</button>
+    <span id="timer">0:00</span>
+  </div>
+
+  <div id="board"></div>
+
+  <div id="message"></div>
+
   <script>
     if (navigator.serviceWorker) {
       navigator.serviceWorker.register(

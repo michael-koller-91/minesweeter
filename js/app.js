@@ -219,31 +219,43 @@ function newGame() {
       updateCell(idx(r, c));
 }
 
+// Double-tap flags; a single tap reveals (matching desktop left/right click).
+// The first tap schedules a reveal; a second tap within the window cancels it
+// and flags instead. This matters because flag() rejects already-revealed
+// cells, so the reveal must not have happened yet when the flag runs.
 function attachTouch(el, i) {
-  let t = null;
+  let pending = null;   // scheduled reveal timer
+  let moved = false;
   let start = null;
   el.addEventListener('touchstart', (e) => {
+    // non-passive: must preventDefault() to kill the browser's double-tap zoom
+    e.preventDefault();
     start = [e.touches[0].clientX, e.touches[0].clientY];
-    t = setTimeout(() => { onAction(i, 'flag'); t = null; }, 500);
-  }, { passive: true });
+    moved = false;
+  }, { passive: false });
   el.addEventListener('touchmove', (e) => {
-    if (!t) return;
+    if (!start) return;
     const dx = e.touches[0].clientX - start[0];
     const dy = e.touches[0].clientY - start[1];
     if (dx * dx + dy * dy > 25) {
-      clearTimeout(t);
-      t = null;
+      moved = true;
+      if (pending) { clearTimeout(pending); pending = null; }
     }
   }, { passive: true });
   el.addEventListener('touchend', () => {
-    if (t) {
-      clearTimeout(t);
-      onAction(i, 'reveal');
-      t = null;
-    }
     start = null;
+    if (moved) return; // a scroll, not a tap
+    if (pending) {
+      // second tap: cancel the pending reveal, flag instead
+      clearTimeout(pending);
+      pending = null;
+      onAction(i, 'flag');
+      return;
+    }
+    // first tap: schedule a reveal; a quick follow-up cancels it and flags
+    pending = setTimeout(() => { pending = null; onAction(i, 'reveal'); }, 250);
   }, { passive: true });
-  el.addEventListener('touchcancel', () => { if (t) { clearTimeout(t); t = null; } });
+  el.addEventListener('touchcancel', () => { if (pending) { clearTimeout(pending); pending = null; } start = null; });
 }
 
 function buildBoard() {
@@ -256,12 +268,15 @@ function buildBoard() {
       el.className = 'cell';
       el.type = 'button';
       el.dataset.i = i;
-      el.addEventListener('click', () => onAction(i, 'reveal'));
-      if (!isTouch) el.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        onAction(i, 'flag');
-      });
-      if (isTouch) attachTouch(el, i);
+      if (!isTouch) {
+        el.addEventListener('click', () => onAction(i, 'reveal'));
+        el.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          onAction(i, 'flag');
+        });
+      } else {
+        attachTouch(el, i);
+      }
       cells[i] = el;
       board.appendChild(el);
     }

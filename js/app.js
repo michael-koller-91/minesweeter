@@ -1,22 +1,29 @@
-const COLS = 9, ROWS = 9;
-const W = COLS + 2, H = ROWS + 2, SIZE = W * H; // padded board: 11x11 internally
+const COLS = 9;
+const ROWS = 9;
+const W = COLS + 2; // boundary padding
+const H = ROWS + 2;
+const SIZE = W * H;
 const MINE_COUNT = 10;
 const NEIGHBORS = [-W - 1, -W, -W + 1, -1, 1, W - 1, W, W + 1];
 
+const cells = new Array(SIZE);
 const counts = new Int8Array(SIZE);
-const revealed = new Uint8Array(SIZE);
 const flagged = new Uint8Array(SIZE);
 const mined = new Uint8Array(SIZE);
-const cells = new Array(SIZE);
+const revealed = new Uint8Array(SIZE);
 
-let firstClick = true, gameOver = false, revealedCount = 0;
-let flaggedCount = 0, timer = null, seconds = 0;
+let firstClick = true;
+let flaggedCount = 0;
+let gameOver = false;
+let revealedCount = 0;
+let seconds = 0;
+let timer = null;
 
 const board = document.getElementById('board');
-const mineCountEl = document.getElementById('mineCount');
-const timerEl = document.getElementById('timer');
 const messageEl = document.getElementById('message');
+const mineCountEl = document.getElementById('mineCount');
 const resetBtn = document.getElementById('reset');
+const timerEl = document.getElementById('timer');
 
 const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 
@@ -46,6 +53,7 @@ function placeMines(firstIdx) {
     }
 }
 
+// left-click: show number or mine; right-click: show/remove flag
 function updateCell(i) {
   const el = cells[i];
   if (!el) return;
@@ -60,22 +68,36 @@ function updateCell(i) {
   }
 }
 
+// false if on boundary padding
+function withinBoard(i) {
+  const r = Math.floor(i / W);
+  const c = i % W;
+  if (r < 1 || r > ROWS || c < 1 || c > COLS) {
+    return false;
+  } else {
+    return true;
+  }
+}
+
 function reveal(i) {
   if (gameOver || flagged[i] || revealed[i]) return;
   if (mined[i]) { lose(); return; }
 
+  if (!withinBoard(i)) return;
   const newly = [i];
-  revealed[i] = 1; revealedCount++;
+  revealed[i] = 1;
+  revealedCount++;
   if (counts[i] === 0) {
     const stack = [i];
     while (stack.length) {
       const cur = stack.pop();
       for (const d of NEIGHBORS) {
         const j = cur + d;
-        const r = Math.floor(j / W), c = j % W;
-        if (r < 1 || r > ROWS || c < 1 || c > COLS) continue; // skip padded border
+        if (!withinBoard(j)) continue;
         if (revealed[j] || flagged[j] || mined[j]) continue;
-        revealed[j] = 1; revealedCount++; newly.push(j);
+        revealed[j] = 1;
+        revealedCount++;
+        newly.push(j);
         if (counts[j] === 0) stack.push(j);
       }
     }
@@ -84,13 +106,15 @@ function reveal(i) {
   checkWin();
 }
 
-// Chord: click a revealed numbered cell whose neighbors are all flagged
+// clicking a revealed numbered cell with right number of flagged neighbors reveals unflagged neighbors
 function chord(i) {
   if (gameOver || !revealed[i] || flagged[i]) return;
   const n = counts[i];
   if (n === 0) return;
   let f = 0;
-  for (const d of NEIGHBORS) if (flagged[i + d]) f++;
+  for (const d of NEIGHBORS) {
+    if (flagged[i + d]) f++;
+  }
   if (f !== n) return;
   for (const d of NEIGHBORS) {
     const j = i + d;
@@ -119,19 +143,24 @@ function lose() {
   for (let r = 1; r <= ROWS; r++)
     for (let c = 1; c <= COLS; c++) {
       const i = idx(r, c);
-      if (mined[i] && !revealed[i]) { revealed[i] = 1; updateCell(i); }
+      if (mined[i] && !revealed[i]) {
+        revealed[i] = 1;
+        updateCell(i);
+      }
     }
 }
 
 function checkWin() {
   if (revealedCount !== COLS * ROWS - MINE_COUNT) return;
-  gameOver = true;
   stopTimer();
   for (let r = 1; r <= ROWS; r++)
     for (let c = 1; c <= COLS; c++) {
       const i = idx(r, c);
-      if (mined[i] && !flagged[i]) { flagged[i] = 1; updateCell(i); }
+      if (mined[i] && !flagged[i]) {
+        flag(i)
+      }
     }
+  gameOver = true;
   messageEl.textContent = '🎉 You win!';
   messageEl.classList.add('won');
 }
@@ -140,7 +169,11 @@ function onAction(i, action) {
   if (gameOver) return;
   if (action === 'reveal') {
     if (flagged[i]) return;
-    if (firstClick) { placeMines(i); firstClick = false; startTimer(); }
+    if (firstClick) {
+      placeMines(i);
+      firstClick = false;
+      startTimer();
+    }
     if (revealed[i]) chord(i);
     else reveal(i);
   } else {
@@ -160,13 +193,24 @@ function startTimer() {
 }
 
 function stopTimer() {
-  if (timer) { clearInterval(timer); timer = null; }
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
+  }
 }
 
 function newGame() {
-  counts.fill(0); revealed.fill(0); flagged.fill(0); mined.fill(0);
-  firstClick = true; gameOver = false; revealedCount = 0; flaggedCount = 0;
-  stopTimer(); seconds = 0; timerEl.textContent = '0:00';
+  counts.fill(0);
+  revealed.fill(0);
+  flagged.fill(0);
+  mined.fill(0);
+  firstClick = true;
+  gameOver = false;
+  revealedCount = 0;
+  flaggedCount = 0;
+  stopTimer();
+  seconds = 0;
+  timerEl.textContent = '0:00';
   updateMineCount();
   messageEl.textContent = '';
   messageEl.classList.remove('lost', 'won');
@@ -176,7 +220,8 @@ function newGame() {
 }
 
 function attachTouch(el, i) {
-  let t = null, start = null;
+  let t = null;
+  let start = null;
   el.addEventListener('touchstart', (e) => {
     start = [e.touches[0].clientX, e.touches[0].clientY];
     t = setTimeout(() => { onAction(i, 'flag'); t = null; }, 500);
@@ -185,10 +230,17 @@ function attachTouch(el, i) {
     if (!t) return;
     const dx = e.touches[0].clientX - start[0];
     const dy = e.touches[0].clientY - start[1];
-    if (dx * dx + dy * dy > 25) { clearTimeout(t); t = null; }
+    if (dx * dx + dy * dy > 25) {
+      clearTimeout(t);
+      t = null;
+    }
   }, { passive: true });
   el.addEventListener('touchend', () => {
-    if (t) { clearTimeout(t); onAction(i, 'reveal'); t = null; }
+    if (t) {
+      clearTimeout(t);
+      onAction(i, 'reveal');
+      t = null;
+    }
     start = null;
   }, { passive: true });
   el.addEventListener('touchcancel', () => { if (t) { clearTimeout(t); t = null; } });
